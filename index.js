@@ -83,5 +83,17 @@ client.on('message', async (message) => {
   }
 });
 
-io.on('connection', (socket) => {
+io.on('connection', (socket) => {  ok: false,
+        mensaje: 'No se pudo enviar el mensaje'
+      });
+    }
+  });
+});
+
+server.listen(PORT, () => {
+  console.log(`Servidor iniciado en puerto ${PORT}`);
+});
+
+client.initialize();
+
 
