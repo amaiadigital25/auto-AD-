@@ -1,13 +1,11 @@
 const express = require('express');
-const http = require('http');
-const { Server } = require('socket.io');
-const { Client, LocalAuth } = require('whatsapp-web.js');
-const qrcode = require('qrcode-terminal');
 const QRCode = require('qrcode');
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
+
+const PORT = process.env.PORT || 3000;
 
 app.use(express.static('public'));
 
@@ -17,7 +15,15 @@ const client = new Client({
   }),
   puppeteer: {
     headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox']
+    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--single-process',
+      '--no-zygote'
+    ]
   }
 });
 
@@ -27,10 +33,10 @@ client.on('qr', async (qr) => {
   qrcode.generate(qr, { small: true });
 
   try {
-    const qrBase64 = await QRCode.toDataURL(qr);
-    io.emit('qr', qrBase64);
-  } catch (err) {
-    console.error('Error generando QR:', err);
+    const qrImage = await QRCode.toDataURL(qr);
+    io.emit('qr', qrImage);
+  } catch (error) {
+    console.error('Error generando el QR:', error);
   }
 });
 
@@ -38,13 +44,13 @@ client.on('authenticated', () => {
   console.log('WhatsApp autenticado correctamente');
 });
 
-client.on('auth_failure', (msg) => {
-  console.error('Error de autenticación:', msg);
-});
-
 client.on('ready', () => {
   console.log('WhatsApp conectado y listo');
   io.emit('ready');
+});
+
+client.on('auth_failure', (msg) => {
+  console.error('Error de autenticación:', msg);
 });
 
 client.on('disconnected', (reason) => {
@@ -52,56 +58,30 @@ client.on('disconnected', (reason) => {
 });
 
 client.on('message', async (message) => {
-  const texto = message.body.toLowerCase();
+  const texto = message.body.toLowerCase().trim();
 
   console.log(`Mensaje recibido de ${message.from}: ${message.body}`);
 
-  if (texto === 'hola') {
-    await message.reply('👋 Hola, gracias por comunicarte con Amaia Digital. ¿En qué podemos ayudarte?');
-  }
+  try {
+    if (texto === 'hola') {
+      await message.reply('👋 Hola, gracias por comunicarte con Amaia Digital. ¿En qué podemos ayudarte?');
+    }
 
-  if (texto.includes('precio')) {
-    await message.reply('💲 Nuestros servicios son personalizados. Contanos qué necesitás y te enviamos un presupuesto.');
-  }
+    if (texto.includes('precio')) {
+      await message.reply('💲 Nuestros precios son personalizados. Decinos qué necesitás y te enviamos una propuesta.');
+    }
 
-  if (texto.includes('web')) {
-    await message.reply('🌐 Creamos páginas web, tiendas online y automatizaciones para tu negocio.');
-  }
+    if (texto.includes('web')) {
+      await message.reply('🌐 Creamos páginas web, tiendas online y landing pages profesionales.');
+    }
 
-  if (texto.includes('whatsapp')) {
-    await message.reply('🤖 Podemos automatizar tu WhatsApp con respuestas automáticas y conexión por QR.');
+    if (texto.includes('whatsapp')) {
+      await message.reply('🤖 Podemos automatizar tu WhatsApp con respuestas automáticas y QR de conexión.');
+    }
+  } catch (error) {
+    console.error('Error respondiendo mensaje:', error);
   }
 });
 
 io.on('connection', (socket) => {
-  console.log('Usuario conectado al panel web');
 
-  socket.on('send-message', async (data) => {
-    try {
-      const numero = data.numero.replace(/\D/g, '');
-      const chatId = `${numero}@c.us`;
-
-      await client.sendMessage(chatId, data.mensaje);
-
-      socket.emit('message-status', {
-        ok: true,
-        mensaje: 'Mensaje enviado correctamente'
-      });
-    } catch (err) {
-      console.error(err);
-
-      socket.emit('message-status', {
-        ok: false,
-        mensaje: 'No se pudo enviar el mensaje'
-      });
-    }
-  });
-});
-
-const PORT = process.env.PORT || 3000;
-
-server.listen(PORT, () => {
-  console.log(`Servidor iniciado en http://localhost:${PORT}`);
-});
-
-client.initialize();
