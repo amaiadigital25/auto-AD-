@@ -1,4 +1,4 @@
-const express = require('express');
+ const express = require('express');
 const QRCode = require('qrcode');
 
 const app = express();
@@ -6,7 +6,9 @@ const server = http.createServer(app);
 const io = new Server(server);
 
 const PORT = process.env.PORT || 3000;
-
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`Servidor iniciado en puerto ${PORT}`);
+});
 app.use(express.static('public'));
 
 const client = new Client({
